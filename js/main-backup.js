@@ -36,8 +36,8 @@ openRequest.onupgradeneeded = function(e) {
 openRequest.onsuccess = function(e) {
     console.log("Success!");
     db = e.target.result;
-    loadData();
-    loadDoneData();
+    loadData(0);
+    loadDoneData(0);
 }
 
 document.onkeydown = function(e) {
@@ -46,9 +46,10 @@ document.onkeydown = function(e) {
         var t = db.transaction(["test"], "readwrite");
         var store = t.objectStore('test');
         
-        var List = $("#List")[0].value;
+        var List = document.getElementById("List").value;
+        console.log(List);
 
-        var request = store.put(List);
+        var request = store.add(List);
 
         request.onsuccess = function(e) {
             window.location.href = "index.html";
@@ -63,7 +64,7 @@ openRequest.onerror = function(e) {
     console.dir(e);
 }
 
-function loadData() {
+function loadData(N) {
     //打开页面的时候显示历史纪录
     var t = db.transaction(["test"], "readonly");
     var store = t.objectStore('test');
@@ -78,27 +79,7 @@ function loadData() {
             var List = res.value;
             var key = res.key;
             displayToDo(List, num, key);
-            num++;
-            res.continue();
-        }
-    }
-}
 
-function loadDoneData() {
-    //打开页面的时候显示历史纪录
-    var t = db.transaction(["DoneList"], "readonly");
-    var store = t.objectStore('DoneList');
-
-    var cursor = store.openCursor();
-
-    var num = 1;
-    
-    cursor.onsuccess = function(e) {
-        var res = e.target.result;
-        if (res) {
-            var List = res.value;
-            var key = res.key;
-            displayDone(List, num, key);
             num++;
             res.continue();
         }
@@ -142,10 +123,70 @@ function displayToDo(List, num, key) {
     insertAfter(toDoList, prevTag);
 }
 
+function updata(num, key) {
+    var child = document.getElementById("p"+num);
+    
+    var parent = child.parentNode;
+    var grandparent = parent.parentNode;
+    var final = grandparent.parentNode;
+
+
+    var t = db.transaction(["test"], "readonly");
+    var store = t.objectStore('test');
+
+    var used = db.transaction(["test"], "readwrite");
+    var thestore = used.objectStore("test");
+
+    thestore.delete(key);
+
+    final.removeChild(grandparent);
+
+    var t = db.transaction(["DoneList"], "readwrite");
+    var store = t.objectStore("DoneList");
+    var value = child.innerHTML;
+    store.add(value);
+
+    loadDoneData(0);
+}
+
+function loadDoneData(N) {
+    if (document.getElementById("todolist") != null) {
+        var parent = document.getElementById("div2");
+        var child = document.getElementsByTagName("ul");
+    
+        var num = child.length;
+
+        for (i=0; i<num; num--) {
+            parent.removeChild(child[i]);
+        }
+    }
+
+    //打开页面的时候显示历史纪录
+    var t = db.transaction(["DoneList"], "readonly");
+    var store = t.objectStore('DoneList');
+
+    var cursor = store.openCursor();
+
+    var cursor =store.openCursor();
+
+    var num = 1;
+    
+    cursor.onsuccess = function(e) {
+        var res = e.target.result;
+        if (res) {
+            var List = res.value;
+            var key = res.key;
+            displayDone(List, num, key);
+            num++;
+            res.continue();
+        }
+    }
+}
+
 function displayDone(List, num, key) {
     //用来在页面中显示
-    var doneList = document.createElement("ul");
-    doneList.setAttribute("id", "doneList");
+    var toDoList = document.createElement("ul");
+    toDoList.setAttribute("id", "todolist");
 
     var aList = document.createElement("li");
     aList.setAttribute("draggable", "true");
@@ -155,7 +196,7 @@ function displayDone(List, num, key) {
     checkBox.setAttribute("onchange", "newUpdata(" +num+ "," +key+ ")");
 
     var para = document.createElement("p");
-    para.setAttribute("id", "pd"+num);
+    para.setAttribute("id", "p"+num);
     para.setAttribute("onclick", "editDone("+key+","+num+")");
 
     var paraNode = document.createTextNode(List);
@@ -172,33 +213,15 @@ function displayDone(List, num, key) {
     aList.appendChild(para);
     aList.appendChild(Delete);
 
-    doneList.appendChild(aList);
+    toDoList.appendChild(aList);
 
     var prevTag = document.getElementById("Done");
 
-    insertAfter(doneList, prevTag);
-}
-
-function updata(num, key) {
-    var child = document.getElementById("p"+num);
-
-    var used = db.transaction(["test"], "readwrite");
-    var thestore = used.objectStore("test");
-
-    thestore.delete(key);
-
-    var t = db.transaction(["DoneList"], "readwrite");
-    var store = t.objectStore("DoneList");
-
-    var value = child.innerHTML;
-
-    store.put(value);
-    
-    refresh();
+    insertAfter(toDoList, prevTag);
 }
 
 function newUpdata(num, key) {
-    var child = document.getElementById("pd"+num);
+    var child = document.getElementById("p"+num);
     
     var used = db.transaction(["DoneList"], "readwrite");
     var thestore = used.objectStore("DoneList");
@@ -208,64 +231,49 @@ function newUpdata(num, key) {
     var t = db.transaction(["test"], "readwrite");
     var store = t.objectStore("test");
     var value = child.innerHTML;
-
-    store.put(value);
+    var request = store.add(value);
     
-    refresh();
-}
+    request.onsuccess = function(e) {
+        window.location.href = "index.html";
+    }
 
-function deleteToDo(key) {
-    var used = db.transaction(["test"], "readwrite");
-    var thestore = used.objectStore("test");
 
-    thestore.delete(key);
-
-    refresh()
+    loadData(0);
 }
 
 function deleteDone(key) {
     var used = db.transaction(["DoneList"], "readwrite");
     var thestore = used.objectStore("DoneList");
 
-    thestore.delete(key);
+    var request = thestore.delete(key);
     
-    refresh();
+    request.onsuccess = function(e) {
+        window.location.href = "index.html";
+    }
+
+    loadDoneData(1);
 }
 
-function editToDo(key, num) {
-    var p = document.getElementById("p"+num);
+function deleteToDo(key) {
+    var used = db.transaction(["test"], "readwrite");
+    var thestore = used.objectStore("test");
 
-    var title = p.innerHTML;
-
-    p.innerHTML = "<input id='input-" +num+ "'value="+title+">";
-
-    var input = document.getElementById("input-"+num);
-    input.setSelectionRange(0, input.value.length);
-	input.focus();
-    
-    input.onblur = function() {
-        var message = input.value;
-
-        var used = db.transaction(["test"], "readwrite");
-        var thestore = used.objectStore("test");
-        var objectStoreRequest = thestore.get(key);
-        thestore.put(message, key);
-
-
-        objectStoreRequest.onsuccess = function(e){
-            refresh();
-            console.log("success");
-        }
+    request = thestore.delete(key);
+    request.onsuccess = function(e) {
+        window.location.href = "index.html";
     }
+    loadData(1);
 }
 
 function editDone(key, num) {
-    var p = document.getElementById("pd"+num);
+    var p = document.getElementById("p"+num);
+
+    console.log(p);
 
     var title = p.innerHTML;
 
-    p.innerHTML = "<input id='inputd-" +num+"'value="+title+">";
-    var input = document.getElementById("inputd-"+num);
+    p.innerHTML = "<input id='input-" +num+"'value="+title+"' />";
+    var input = document.getElementById("input-"+num);
 	input.setSelectionRange(0, input.value.length);
 	input.focus();
     
@@ -275,15 +283,35 @@ function editDone(key, num) {
         var used = db.transaction(["DoneList"], "readwrite");
         var thestore = used.objectStore("DoneList");
         var objectStoreRequest = thestore.get(key);
-        thestore.put(message, key);
 
         objectStoreRequest.onsuccess = function(e) {
-            refresh();
-            console.log("success")
+            thestore.put(message);
+            deleteDone(key);
         }
     }
 }
 
-function refresh(){
-    setTimeout("location.reload();", 50);
+function editToDo(key, num) {
+    var p = document.getElementById("p"+num);
+
+    var title = p.innerHTML;
+
+    p.innerHTML = "<input id='input-" +num+ "' value='"+title+"/>";
+
+    var input = document.getElementById("input-"+num);
+	input.setSelectionRange(0, input.value.length);
+	input.focus();
+    
+    input.onblur = function() {
+        var message = input.value;
+
+        var used = db.transaction(["test"], "readwrite");
+        var thestore = used.objectStore("test");
+        var objectStoreRequest = thestore.get(key);
+
+        objectStoreRequest.onsuccess = function(e) {
+            thestore.put(message);
+            deleteToDo(key);
+        }
+    }
 }
